@@ -96,14 +96,40 @@ async def smart_farm_loop(category_id, log_callback=None):
         ]
 
         if not active:
+            now = datetime.now(timezone.utc)
             upcoming = sorted(
-                (d for d in all_drops if (d.get('starts_at') or d.get('start_at'))),
+                (
+                    d for d in all_drops
+                    if (
+                        (d.get('starts_at') or d.get('start_at'))
+                        and (
+                            datetime.fromisoformat((d.get('starts_at') or d.get('start_at')).replace('Z', '+00:00')) > now
+                        )
+                    )
+                ),
                 key=lambda d: (d.get('starts_at') or d.get('start_at'))
             )
             if upcoming:
                 soonest = upcoming[0].get('starts_at') or upcoming[0].get('start_at')
+                soonest_dt = datetime.fromisoformat(soonest.replace('Z', '+00:00'))
+                seconds = int((soonest_dt - now).total_seconds())
+                days = seconds // 86400
+                hours = (seconds % 86400) // 3600
+                minutes = (seconds % 3600) // 60
+
+                if days > 0:
+                    time_str = f"in {days} day{'s' if days != 1 else ''}"
+                    if days < 10 and hours > 0:
+                        time_str += f" {hours}h"
+                elif hours > 0:
+                    time_str = f"in {hours}h"
+                    if minutes > 0:
+                        time_str += f" {minutes}m"
+                else:
+                    time_str = f"in {minutes}m"
+
                 if log_callback:
-                    log_callback(f"No active drops found. Next drop will begin at {soonest}")
+                    log_callback(f"No active drops found. Next drop will begin {time_str} ({soonest})")
             else:
                 if log_callback:
                     log_callback("No active drops or upcoming drops found.")
